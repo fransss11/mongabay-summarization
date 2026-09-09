@@ -604,6 +604,7 @@ article = st.text_area(
         "Tempel artikel berita "
         "yang ingin diringkas di sini..."
     ),
+    key="article_input",
 )
 
 
@@ -624,6 +625,7 @@ with col2:
     )
 
 if reset_button:
+    st.session_state.article_input = ""
     st.rerun()
 
 # ============================================================
