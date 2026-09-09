@@ -23,7 +23,7 @@ SELECTION_RATIO = 0.50
 GENERATION_CONFIG = {
     "max_new_tokens": 200,
     "min_length": 80,
-    "num_beams": 2,
+    "num_beams": 6,
     "length_penalty": 1.0,
     "early_stopping": True,
     "no_repeat_ngram_size": 3,
