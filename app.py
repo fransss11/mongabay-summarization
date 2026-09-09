@@ -593,13 +593,12 @@ st.subheader(
     "Masukkan Artikel"
 )
 
+def reset_article():
+    st.session_state.article_input = ""
 
 article = st.text_area(
-
     "Teks artikel",
-
     height=350,
-
     placeholder=(
         "Tempel artikel berita "
         "yang ingin diringkas di sini..."
@@ -622,12 +621,8 @@ with col2:
         "Reset",
         type="primary",
         use_container_width=True,
+        on_click=reset_article,
     )
-
-if reset_button:
-    st.session_state.article_input = ""
-    st.rerun()
-
 # ============================================================
 # PROSES
 # ============================================================
