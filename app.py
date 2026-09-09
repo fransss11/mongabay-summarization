@@ -619,6 +619,7 @@ with col1:
 with col2:
     reset_button = st.button(
         "Reset",
+        type="primary",
         use_container_width=True,
     )
 
