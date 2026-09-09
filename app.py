@@ -1,4 +1,3 @@
-import os
 import re
 import math
 import difflib
@@ -16,8 +15,8 @@ from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 # KONFIGURASI
 # ============================================================
 
-SBERT_MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-T5_MODEL_PATH = "username-kamu/mongabay-t5-summarization"
+SBERT_MODEL_NAME = ("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
+T5_MODEL_PATH = "dreasss/mongabay-t5-summarization"
 
 SELECTION_RATIO = 0.50
 
@@ -30,6 +29,7 @@ GENERATION_CONFIG = {
     "no_repeat_ngram_size": 3,
     "repetition_penalty": 2.0,
 }
+
 
 NORMALIZATION_DICT = {
     "gk": "tidak",
@@ -68,22 +68,23 @@ NORMALIZATION_DICT = {
 def load_sbert():
     return SentenceTransformer(SBERT_MODEL_NAME)
 
-
 @st.cache_resource(show_spinner=False)
 def load_t5(model_path):
-    if not os.path.isdir(model_path):
-        raise FileNotFoundError(
-            f"Folder model T5 tidak ditemukan: {model_path}\n"
-            "Letakkan folder model_t5_finetunedcoba di samping app.py "
-            "atau atur environment variable MODEL_T5_PATH."
-        )
 
-    tokenizer = AutoTokenizer.from_pretrained(model_path)
-    model = AutoModelForSeq2SeqLM.from_pretrained(model_path)
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_path
+    )
+
+    model = AutoModelForSeq2SeqLM.from_pretrained(
+        model_path
+    )
 
     model.config.forced_bos_token_id = None
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device(
+        "cuda" if torch.cuda.is_available() else "cpu"
+    )
+
     model.to(device)
     model.eval()
 
@@ -95,34 +96,59 @@ def load_t5(model_path):
 # ============================================================
 
 def text_cleaning(text: str) -> str:
+
     if not isinstance(text, str):
         return ""
 
     text = text.lower().strip()
-    text = re.sub(r"http\S+|www\.\S+", " ", text)
-    text = re.sub(r"<.*?>", " ", text)
-    text = re.sub(r"\s+", " ", text).strip()
+
+    text = re.sub(
+        r"http\S+|www\.\S+",
+        " ",
+        text
+    )
+
+    text = re.sub(
+        r"<.*?>",
+        " ",
+        text
+    )
+
+    text = re.sub(
+        r"\s+",
+        " ",
+        text
+    ).strip()
 
     return text
 
 
 def normalize_text(text: str) -> str:
+
     if not isinstance(text, str):
         return ""
 
     tokens = text.split()
-    tokens = [NORMALIZATION_DICT.get(tok, tok) for tok in tokens]
+
+    tokens = [
+        NORMALIZATION_DICT.get(tok, tok)
+        for tok in tokens
+    ]
 
     return " ".join(tokens)
 
 
 def segment_sentences(text: str) -> list[str]:
+
     if not isinstance(text, str) or not text.strip():
         return []
 
     sentences = [
         s.strip()
-        for s in re.split(r"(?<=[.!?])(?!\d)\s*", text)
+        for s in re.split(
+            r"(?<=[.!?])(?!\d)\s*",
+            text
+        )
         if s.strip()
     ]
 
@@ -130,8 +156,11 @@ def segment_sentences(text: str) -> list[str]:
 
 
 def preprocess_article(text: str) -> tuple[str, list[str]]:
+
     cleaned = text_cleaning(text)
+
     normalized = normalize_text(cleaned)
+
     sentences = segment_sentences(normalized)
 
     return normalized, sentences
@@ -141,7 +170,11 @@ def preprocess_article(text: str) -> tuple[str, list[str]]:
 # SBERT + COSINE SIMILARITY
 # ============================================================
 
-def calculate_representativeness(sentences, sbert_model):
+def calculate_representativeness(
+    sentences,
+    sbert_model
+):
+
     if not sentences:
         return None, [], []
 
@@ -151,33 +184,59 @@ def calculate_representativeness(sentences, sbert_model):
         normalize_embeddings=True,
     )
 
-    sim_matrix = cosine_similarity(embeddings)
+    sim_matrix = cosine_similarity(
+        embeddings
+    )
 
     n_total = len(sentences)
 
     if n_total > 1:
+
         avg_scores = (
             sim_matrix.sum(axis=1) - 1
         ) / (n_total - 1)
+
     else:
-        avg_scores = np.ones(n_total, dtype=float)
 
-    return embeddings, sim_matrix, avg_scores.tolist()
+        avg_scores = np.ones(
+            n_total,
+            dtype=float
+        )
+
+    return (
+        embeddings,
+        sim_matrix,
+        avg_scores.tolist()
+    )
 
 
-def select_candidate_sentences(sentences, scores, ratio=SELECTION_RATIO):
+def select_candidate_sentences(
+    sentences,
+    scores,
+    ratio=SELECTION_RATIO
+):
+
     if not sentences or not scores:
         return ""
 
     k = max(
         1,
-        math.ceil(len(sentences) * ratio),
+        math.ceil(
+            len(sentences) * ratio
+        )
     )
 
-    top_indices = np.argsort(np.asarray(scores, dtype=float))[-k:]
+    top_indices = np.argsort(
+        np.asarray(
+            scores,
+            dtype=float
+        )
+    )[-k:]
 
     # Pertahankan urutan kalimat asli
-    top_indices = np.sort(top_indices)
+    top_indices = np.sort(
+        top_indices
+    )
 
     selected = [
         sentences[i]
@@ -191,7 +250,13 @@ def select_candidate_sentences(sentences, scores, ratio=SELECTION_RATIO):
 # GENERASI T5
 # ============================================================
 
-def generate_summary(text, tokenizer, model, device):
+def generate_summary(
+    text,
+    tokenizer,
+    model,
+    device
+):
+
     if not isinstance(text, str) or not text.strip():
         return ""
 
@@ -204,25 +269,53 @@ def generate_summary(text, tokenizer, model, device):
         max_length=512,
     )
 
-    input_ids = inputs.input_ids.to(device)
-    attention_mask = inputs.attention_mask.to(device)
+    input_ids = inputs.input_ids.to(
+        device
+    )
+
+    attention_mask = inputs.attention_mask.to(
+        device
+    )
 
     with torch.no_grad():
+
         summary_ids = model.generate(
+
             input_ids=input_ids,
+
             attention_mask=attention_mask,
 
-            max_new_tokens=GENERATION_CONFIG["max_new_tokens"],
-            min_length=GENERATION_CONFIG["min_length"],
+            max_new_tokens=GENERATION_CONFIG[
+                "max_new_tokens"
+            ],
 
-            num_beams=GENERATION_CONFIG["num_beams"],
-            length_penalty=GENERATION_CONFIG["length_penalty"],
-            early_stopping=GENERATION_CONFIG["early_stopping"],
+            min_length=GENERATION_CONFIG[
+                "min_length"
+            ],
 
-            no_repeat_ngram_size=GENERATION_CONFIG["no_repeat_ngram_size"],
-            repetition_penalty=GENERATION_CONFIG["repetition_penalty"],
+            num_beams=GENERATION_CONFIG[
+                "num_beams"
+            ],
 
-            forced_eos_token_id=tokenizer.eos_token_id,
+            length_penalty=GENERATION_CONFIG[
+                "length_penalty"
+            ],
+
+            early_stopping=GENERATION_CONFIG[
+                "early_stopping"
+            ],
+
+            no_repeat_ngram_size=GENERATION_CONFIG[
+                "no_repeat_ngram_size"
+            ],
+
+            repetition_penalty=GENERATION_CONFIG[
+                "repetition_penalty"
+            ],
+
+            forced_eos_token_id=(
+                tokenizer.eos_token_id
+            ),
         )
 
     summary = tokenizer.decode(
@@ -237,14 +330,22 @@ def generate_summary(text, tokenizer, model, device):
     )
 
     source_words = set(
-        re.findall(r"\b[a-z]+(?:[-'][a-z]+)?\b", text.lower())
+        re.findall(
+            r"\b[a-z]+(?:[-'][a-z]+)?\b",
+            text.lower()
+        )
     )
 
     def auto_correct(match):
+
         word = match.group(0)
+
         word_lower = word.lower()
 
-        if len(word_lower) <= 3 or word_lower in source_words:
+        if (
+            len(word_lower) <= 3
+            or word_lower in source_words
+        ):
             return word
 
         matches = difflib.get_close_matches(
@@ -255,10 +356,12 @@ def generate_summary(text, tokenizer, model, device):
         )
 
         if matches:
+
             corrected = matches[0]
 
             if word.istitle():
                 return corrected.title()
+
             elif word.isupper():
                 return corrected.upper()
 
@@ -272,27 +375,41 @@ def generate_summary(text, tokenizer, model, device):
         summary,
     )
 
-    # Hapus kalimat duplikat.
     sentences = re.split(
         r"(?<=[.])\s+",
         summary,
     )
 
     seen = []
+
     seen_lower = set()
 
     for sentence in sentences:
-        normalized_sentence = sentence.lower().strip()
 
-        if normalized_sentence and normalized_sentence not in seen_lower:
+        normalized_sentence = (
+            sentence.lower().strip()
+        )
+
+        if (
+            normalized_sentence
+            and normalized_sentence
+            not in seen_lower
+        ):
+
             seen.append(sentence)
-            seen_lower.add(normalized_sentence)
+
+            seen_lower.add(
+                normalized_sentence
+            )
 
     summary = " ".join(seen)
 
-    # Pastikan berakhir dengan titik.
     if summary:
-        summary = summary.rstrip(".") + "."
+
+        summary = (
+            summary.rstrip(".")
+            + "."
+        )
 
     return summary
 
@@ -301,27 +418,45 @@ def generate_summary(text, tokenizer, model, device):
 # PIPELINE LENGKAP
 # ============================================================
 
-def summarize_article(text, sbert_model, tokenizer, t5_model, device):
-    normalized_text, sentences = preprocess_article(text)
+def summarize_article(
+    text,
+    sbert_model,
+    tokenizer,
+    t5_model,
+    device
+):
 
-    if len(sentences) == 0:
-        raise ValueError(
-            "Tidak ditemukan kalimat yang dapat diproses setelah preprocessing."
-        )
-
-    embeddings, sim_matrix, scores = calculate_representativeness(
-        sentences,
-        sbert_model,
+    normalized_text, sentences = (
+        preprocess_article(text)
     )
 
-    selected_candidates = select_candidate_sentences(
-        sentences,
-        scores,
-        ratio=SELECTION_RATIO,
+    if len(sentences) == 0:
+
+        raise ValueError(
+            "Tidak ditemukan kalimat yang "
+            "dapat diproses setelah preprocessing."
+        )
+
+    embeddings, sim_matrix, scores = (
+        calculate_representativeness(
+            sentences,
+            sbert_model,
+        )
+    )
+
+    selected_candidates = (
+        select_candidate_sentences(
+            sentences,
+            scores,
+            ratio=SELECTION_RATIO,
+        )
     )
 
     if not selected_candidates.strip():
-        raise ValueError("Kandidat kalimat kosong.")
+
+        raise ValueError(
+            "Kandidat kalimat kosong."
+        )
 
     summary = generate_summary(
         selected_candidates,
@@ -331,13 +466,27 @@ def summarize_article(text, sbert_model, tokenizer, t5_model, device):
     )
 
     return {
-        "normalized_text": normalized_text,
-        "sentences": sentences,
-        "sentence_embeddings": embeddings,
-        "similarity_matrix": sim_matrix,
-        "avg_scores": scores,
-        "selected_candidates": selected_candidates,
-        "summary": summary,
+
+        "normalized_text":
+            normalized_text,
+
+        "sentences":
+            sentences,
+
+        "sentence_embeddings":
+            embeddings,
+
+        "similarity_matrix":
+            sim_matrix,
+
+        "avg_scores":
+            scores,
+
+        "selected_candidates":
+            selected_candidates,
+
+        "summary":
+            summary,
     }
 
 
@@ -346,181 +495,375 @@ def summarize_article(text, sbert_model, tokenizer, t5_model, device):
 # ============================================================
 
 st.set_page_config(
-    page_title="Hybrid SBERT + T5 Text Summarization",
+    page_title=(
+        "Hybrid SBERT + T5 "
+        "Text Summarization"
+    ),
+
     page_icon="📝",
+
     layout="wide",
 )
 
-st.title("📝 Text Summarization")
-st.caption(
-    "Extractive candidate selection berbasis SBERT + "
-    "generasi ringkasan menggunakan T5 Fine-Tuned"
+
+st.title(
+    "📝 Text Summarization"
 )
 
+
+st.caption(
+    "Extractive candidate selection "
+    "berbasis SBERT + generasi ringkasan "
+    "menggunakan T5 Fine-Tuned"
+)
+
+
+# ============================================================
+# SIDEBAR
+# ============================================================
+
 with st.sidebar:
-    st.header("Konfigurasi Model")
+
+    st.header(
+        "Konfigurasi Model"
+    )
 
     st.write(
-        f"**SBERT:** `{SBERT_MODEL_NAME}`"
+        f"**SBERT:** "
+        f"`{SBERT_MODEL_NAME}`"
     )
+
     st.write(
-        f"**T5:** `{T5_MODEL_PATH}`"
+        f"**T5:** "
+        f"`{T5_MODEL_PATH}`"
     )
+
     st.write(
-        f"**Seleksi kandidat:** `{SELECTION_RATIO * 100:.0f}%`"
+        f"**Seleksi kandidat:** "
+        f"`{SELECTION_RATIO * 100:.0f}%`"
     )
 
     st.divider()
 
-    st.write("**Parameter generasi T5**")
-    st.write(f"- min_length: `{GENERATION_CONFIG['min_length']}`")
-    st.write(f"- max_new_tokens: `{GENERATION_CONFIG['max_new_tokens']}`")
-    st.write(f"- num_beams: `{GENERATION_CONFIG['num_beams']}`")
-    st.write(f"- length_penalty: `{GENERATION_CONFIG['length_penalty']}`")
-    st.write(f"- early_stopping: `{GENERATION_CONFIG['early_stopping']}`")
+    st.write(
+        "**Parameter generasi T5**"
+    )
+
+    st.write(
+        f"- min_length: "
+        f"`{GENERATION_CONFIG['min_length']}`"
+    )
+
+    st.write(
+        f"- max_new_tokens: "
+        f"`{GENERATION_CONFIG['max_new_tokens']}`"
+    )
+
+    st.write(
+        f"- num_beams: "
+        f"`{GENERATION_CONFIG['num_beams']}`"
+    )
+
+    st.write(
+        f"- length_penalty: "
+        f"`{GENERATION_CONFIG['length_penalty']}`"
+    )
+
+    st.write(
+        f"- early_stopping: "
+        f"`{GENERATION_CONFIG['early_stopping']}`"
+    )
+
     st.write(
         f"- no_repeat_ngram_size: "
         f"`{GENERATION_CONFIG['no_repeat_ngram_size']}`"
     )
+
     st.write(
         f"- repetition_penalty: "
         f"`{GENERATION_CONFIG['repetition_penalty']}`"
     )
 
-st.subheader("Masukkan Artikel")
+
+# ============================================================
+# INPUT ARTIKEL
+# ============================================================
+
+st.subheader(
+    "Masukkan Artikel"
+)
+
 
 article = st.text_area(
+
     "Teks artikel",
+
     height=350,
+
     placeholder=(
-        "Tempel artikel berita yang ingin diringkas di sini..."
+        "Tempel artikel berita "
+        "yang ingin diringkas di sini..."
     ),
 )
 
-col1, col2 = st.columns([1, 5])
+
+col1, col2 = st.columns(
+    [1, 5]
+)
+
 
 with col1:
+
     process_button = st.button(
+
         "🚀 Ringkas",
+
         type="primary",
+
         use_container_width=True,
     )
 
+
+# ============================================================
+# PROSES
+# ============================================================
+
 if process_button:
+
     if not article.strip():
-        st.warning("Silakan masukkan teks artikel terlebih dahulu.")
+
+        st.warning(
+            "Silakan masukkan teks artikel "
+            "terlebih dahulu."
+        )
+
         st.stop()
 
     try:
-        with st.spinner("Memuat model SBERT..."):
+
+        # ====================================================
+        # LOAD SBERT
+        # ====================================================
+
+        with st.spinner(
+            "Memuat model SBERT..."
+        ):
+
             sbert_model = load_sbert()
 
-        with st.spinner("Memuat model T5 Fine-Tuned..."):
-            tokenizer, t5_model, device = load_t5(T5_MODEL_PATH)
 
-        with st.spinner("Memproses artikel dan menghasilkan ringkasan..."):
+        # ====================================================
+        # LOAD T5
+        # ====================================================
+
+        with st.spinner(
+            "Memuat model T5 Fine-Tuned..."
+        ):
+
+            tokenizer, t5_model, device = (
+                load_t5(
+                    T5_MODEL_PATH
+                )
+            )
+
+
+        # ====================================================
+        # PIPELINE
+        # ====================================================
+
+        with st.spinner(
+            "Memproses artikel dan "
+            "menghasilkan ringkasan..."
+        ):
+
             result = summarize_article(
+
                 article,
+
                 sbert_model,
+
                 tokenizer,
+
                 t5_model,
+
                 device,
             )
 
-        st.success("Ringkasan berhasil dibuat.")
 
-        # ----------------------------------------------------
+        st.success(
+            "Ringkasan berhasil dibuat."
+        )
+
+
+        # ====================================================
         # OUTPUT RINGKASAN
-        # ----------------------------------------------------
-        st.subheader("📌 Hasil Ringkasan")
+        # ====================================================
+
+        st.subheader(
+            "📌 Hasil Ringkasan"
+        )
+
 
         st.text_area(
+
             "Ringkasan",
+
             value=result["summary"],
+
             height=220,
         )
 
-        # ----------------------------------------------------
+
+        # ====================================================
         # INFORMASI PIPELINE
-        # ----------------------------------------------------
-        st.subheader("📊 Informasi Proses")
+        # ====================================================
+
+        st.subheader(
+            "📊 Informasi Proses"
+        )
+
 
         selected_count = max(
+
             1,
+
             math.ceil(
-                len(result["sentences"]) * SELECTION_RATIO
+
+                len(result["sentences"])
+
+                * SELECTION_RATIO
             ),
         )
 
-        st.write(f"**Jumlah Kalimat Awal:** {len(result['sentences'])}")
-        st.write(f"**Kandidat Terpilih:** {selected_count}")
-        st.write(f"**Rasio Seleksi:** {SELECTION_RATIO * 100:.0f}%")
 
-        # ----------------------------------------------------
-        # KANDIDAT SBERT
-        # ----------------------------------------------------
+        st.write(
+            f"**Jumlah Kalimat Awal:** "
+            f"{len(result['sentences'])}"
+        )
+
+
+        st.write(
+            f"**Kandidat Terpilih:** "
+            f"{selected_count}"
+        )
+
+
+        st.write(
+            f"**Rasio Seleksi:** "
+            f"{SELECTION_RATIO * 100:.0f}%"
+        )
+
+
+        # ====================================================
+        # SELECTED CANDIDATES
+        # ====================================================
+
         with st.expander(
             "🔎 Lihat Selected Candidates dari SBERT"
         ):
-            st.write(result["selected_candidates"])
 
-        # ----------------------------------------------------
-        # KALIMAT + SKOR
-        # ----------------------------------------------------
+            st.write(
+                result["selected_candidates"]
+            )
+
+
+        # ====================================================
+        # SKOR REPRESENTATIVENESS
+        # ====================================================
+
         with st.expander(
-            "📈 Lihat skor representativeness setiap kalimat"
+            "📈 Lihat skor representativeness "
+            "setiap kalimat"
         ):
+
             score_rows = []
 
-            for idx, (sentence, score) in enumerate(
+            for idx, (
+                sentence,
+                score
+            ) in enumerate(
+
                 zip(
                     result["sentences"],
                     result["avg_scores"],
                 ),
+
                 start=1,
             ):
-                score_rows.append(
-                    {
-                        "No": idx,
-                        "Kalimat": sentence,
-                        "Average Similarity": round(
+
+                score_rows.append({
+
+                    "No":
+                        idx,
+
+                    "Kalimat":
+                        sentence,
+
+                    "Average Similarity":
+                        round(
                             float(score),
                             6,
                         ),
-                    }
-                )
+                })
+
 
             for row in score_rows:
+
                 st.write(
+
                     f"**Kalimat {row['No']}**  \n"
+
                     f"{row['Kalimat']}  \n"
-                    f"Average Similarity: `{row['Average Similarity']}`"
+
+                    f"Average Similarity: "
+                    f"`{row['Average Similarity']}`"
                 )
 
-        # ----------------------------------------------------
+
+        # ====================================================
         # PREPROCESSING
-        # ----------------------------------------------------
+        # ====================================================
+
         with st.expander(
             "🧹 Lihat hasil preprocessing"
         ):
+
             st.text_area(
+
                 "Teks setelah preprocessing",
-                value=result["normalized_text"],
+
+                value=result[
+                    "normalized_text"
+                ],
+
                 height=220,
             )
 
+
+    # ========================================================
+    # ERROR MODEL
+    # ========================================================
+
     except FileNotFoundError as exc:
-        st.error(str(exc))
-        st.info(
-            "Pastikan folder model hasil fine-tuning tersedia. "
-            "Secara default aplikasi mencari folder "
-            "`model_t5_finetunedcoba` di lokasi yang sama dengan app.py."
+
+        st.error(
+            "Model T5 tidak dapat ditemukan."
         )
 
+        st.exception(exc)
+
+
+    # ========================================================
+    # ERROR LAINNYA
+    # ========================================================
+
     except Exception as exc:
+
         st.error(
-            "Terjadi kesalahan saat menjalankan pipeline."
+            "Terjadi kesalahan saat "
+            "menjalankan pipeline."
         )
+
         st.exception(exc)
 
 
@@ -530,8 +873,10 @@ if process_button:
 
 st.divider()
 
+
 st.caption(
-    "Pipeline: Preprocessing → Segmentasi Kalimat → SBERT → "
+    "Pipeline: Preprocessing → "
+    "Segmentasi Kalimat → SBERT → "
     "Cosine Similarity → Seleksi Kandidat 50% → "
     "T5 Fine-Tuned → Ringkasan"
 )
