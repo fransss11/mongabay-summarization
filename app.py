@@ -607,7 +607,7 @@ article = st.text_area(
 )
 
 
-col1, col2 = st.columns([1, 5])
+col1, col2 = st.columns([1, 1])
 
 with col1:
     process_button = st.button(
