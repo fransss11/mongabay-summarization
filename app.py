@@ -607,22 +607,23 @@ article = st.text_area(
 )
 
 
-col1, col2 = st.columns(
-    [1, 5]
-)
-
+col1, col2 = st.columns([1, 5])
 
 with col1:
-
     process_button = st.button(
-
-        "🚀 Ringkas",
-
+        "Ringkas",
         type="primary",
-
         use_container_width=True,
     )
 
+with col2:
+    reset_button = st.button(
+        "Reset",
+        use_container_width=True,
+    )
+
+if reset_button:
+    st.rerun()
 
 # ============================================================
 # PROSES
