@@ -423,8 +423,16 @@ def summarize_article(
     sbert_model,
     tokenizer,
     t5_model,
-    device
+    device,
+    progress_callback=None,
 ):
+
+    def update_progress(progress, message):
+
+        if progress_callback is not None:
+            progress_callback(progress, message)
+
+    update_progress(0.35, "Melakukan preprocessing artikel...")
 
     normalized_text, sentences = (
         preprocess_article(text)
@@ -437,12 +445,19 @@ def summarize_article(
             "dapat diproses setelah preprocessing."
         )
 
+    update_progress(
+        0.50,
+        "Menghitung representativeness dengan SBERT...",
+    )
+
     embeddings, sim_matrix, scores = (
         calculate_representativeness(
             sentences,
             sbert_model,
         )
     )
+
+    update_progress(0.70, "Memilih kandidat kalimat terbaik...")
 
     selected_candidates = (
         select_candidate_sentences(
@@ -458,12 +473,16 @@ def summarize_article(
             "Kandidat kalimat kosong."
         )
 
+    update_progress(0.80, "Menghasilkan ringkasan dengan model T5...")
+
     summary = generate_summary(
         selected_candidates,
         tokenizer,
         t5_model,
         device,
     )
+
+    update_progress(1.0, "Proses selesai.")
 
     return {
 
@@ -640,41 +659,48 @@ if process_button:
 
     try:
 
+        progress_bar = st.progress(
+            0,
+            text="Menyiapkan proses... 0%",
+        )
+
+        def update_process(progress, message):
+            progress_percent = round(progress * 100)
+            progress_bar.progress(
+                progress,
+                text=f"{message} {progress_percent}%",
+            )
+
         # ====================================================
         # LOAD SBERT
         # ====================================================
 
-        with st.spinner(
-            "Memuat model SBERT..."
-        ):
-
+        update_process(0.05, "Memuat model SBERT...")
+        with st.spinner("Memuat model SBERT..."):
             sbert_model = load_sbert()
+
+        update_process(0.25, "Model SBERT siap. Memuat model T5...")
 
 
         # ====================================================
         # LOAD T5
         # ====================================================
 
-        with st.spinner(
-            "Memuat model T5 Fine-Tuned..."
-        ):
-
+        with st.spinner("Memuat model T5 Fine-Tuned..."):
             tokenizer, t5_model, device = (
                 load_t5(
                     T5_MODEL_PATH
                 )
             )
 
+        update_process(0.35, "Model T5 siap. Memproses artikel...")
+
 
         # ====================================================
         # PIPELINE
         # ====================================================
 
-        with st.spinner(
-            "Memproses artikel dan "
-            "menghasilkan ringkasan..."
-        ):
-
+        with st.spinner("Memproses artikel dan menghasilkan ringkasan..."):
             result = summarize_article(
 
                 article,
@@ -686,7 +712,11 @@ if process_button:
                 t5_model,
 
                 device,
+
+                progress_callback=update_process,
             )
+
+            progress_bar.empty()
 
 
         st.success(
