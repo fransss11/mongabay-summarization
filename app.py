@@ -660,6 +660,8 @@ if process_button:
 
     try:
 
+        start_time = time.perf_counter()
+
         progress_bar = st.progress(
             0,
             text="Menyiapkan proses... 0%",
@@ -738,8 +740,29 @@ if process_button:
                 progress_callback=update_process,
             )
 
+        elapsed_seconds = round(
+            time.perf_counter() - start_time
+        )
+
+        elapsed_hours, remaining_seconds = divmod(
+            elapsed_seconds,
+            3600,
+        )
+
+        elapsed_minutes, elapsed_seconds = divmod(
+            remaining_seconds,
+            60,
+        )
+
         st.success(
             "Ringkasan berhasil dibuat."
+        )
+
+        st.info(
+            f"Waktu proses: "
+            f"{elapsed_hours:02d} jam "
+            f"{elapsed_minutes:02d} menit "
+            f"{elapsed_seconds:02d} detik"
         )
 
 
