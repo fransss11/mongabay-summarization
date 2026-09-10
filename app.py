@@ -1,6 +1,7 @@
 import re
 import math
 import difflib
+import time
 
 import numpy as np
 import streamlit as st
@@ -664,12 +665,33 @@ if process_button:
             text="Menyiapkan proses... 0%",
         )
 
+        current_progress = [0.0]
+
         def update_process(progress, message):
-            progress_percent = round(progress * 100)
-            progress_bar.progress(
-                progress,
-                text=f"{message} {progress_percent}%",
+            target_progress = max(
+                current_progress[0],
+                min(progress, 1.0),
             )
+
+            while current_progress[0] < target_progress:
+                current_progress[0] = min(
+                    current_progress[0] + 0.01,
+                    target_progress,
+                )
+
+                progress_percent = round(
+                    current_progress[0] * 100
+                )
+
+                progress_bar.progress(
+                    current_progress[0],
+                    text=(
+                        f"{message} "
+                        f"{progress_percent}%"
+                    ),
+                )
+
+                time.sleep(0.02)
 
         # ====================================================
         # LOAD SBERT
@@ -715,9 +737,6 @@ if process_button:
 
                 progress_callback=update_process,
             )
-
-            progress_bar.empty()
-
 
         st.success(
             "Ringkasan berhasil dibuat."
