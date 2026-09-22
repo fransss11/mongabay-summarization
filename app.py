@@ -842,7 +842,7 @@ if process_button:
         # ====================================================
         # SKOR REPRESENTATIVENESS
         # ====================================================
-        
+
         with st.expander(
             "📊 Lihat hubungan cosine similarity antar kalimat"
         ):
@@ -854,7 +854,10 @@ if process_button:
 
             sentence_labels = [
                 f"Kalimat {i}"
-                for i in range(1, len(result["sentences"]) + 1)
+                for i in range(
+                    1,
+                    len(result["sentences"]) + 1
+                )
             ]
 
             similarity_df = pd.DataFrame(
@@ -871,13 +874,7 @@ if process_button:
             )
 
             st.dataframe(
-                similarity_df.style
-                .background_gradient(
-                    cmap="Blues",
-                    vmin=0,
-                    vmax=1
-                )
-                .format("{:.4f}"),
+                similarity_df,
                 use_container_width=True,
                 height=500
             )
