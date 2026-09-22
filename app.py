@@ -4,6 +4,7 @@ import difflib
 import time
 
 import numpy as np
+import pandas as pd
 import streamlit as st
 import torch
 
@@ -841,56 +842,46 @@ if process_button:
         # ====================================================
         # SKOR REPRESENTATIVENESS
         # ====================================================
-
+        
         with st.expander(
-            "📈 Lihat skor representativeness "
-            "setiap kalimat"
+            "📊 Lihat hubungan cosine similarity antar kalimat"
         ):
 
-            score_rows = []
+            similarity_matrix = np.asarray(
+                result["similarity_matrix"],
+                dtype=float
+            )
 
-            for idx, (
-                sentence,
-                score
-            ) in enumerate(
+            sentence_labels = [
+                f"Kalimat {i}"
+                for i in range(1, len(result["sentences"]) + 1)
+            ]
 
-                zip(
-                    result["sentences"],
-                    result["avg_scores"],
-                ),
+            similarity_df = pd.DataFrame(
+                similarity_matrix,
+                index=sentence_labels,
+                columns=sentence_labels
+            )
 
-                start=1,
-            ):
+            st.write(
+                "Matriks berikut menunjukkan nilai cosine similarity "
+                "antar kalimat berdasarkan representasi embedding SBERT. "
+                "Nilai yang lebih tinggi menunjukkan kemiripan semantik "
+                "yang lebih tinggi antar kalimat."
+            )
 
-                score_rows.append({
-
-                    "No":
-                        idx,
-
-                    "Kalimat":
-                        sentence,
-
-                    "Average Similarity":
-                        round(
-                            float(score),
-                            6,
-                        ),
-                })
-
-
-            for row in score_rows:
-
-                st.write(
-
-                    f"**Kalimat {row['No']}**  \n"
-
-                    f"{row['Kalimat']}  \n"
-
-                    f"Average Similarity: "
-                    f"`{row['Average Similarity']}`"
+            st.dataframe(
+                similarity_df.style
+                .background_gradient(
+                    cmap="Blues",
+                    vmin=0,
+                    vmax=1
                 )
-
-
+                .format("{:.4f}"),
+                use_container_width=True,
+                height=500
+            )
+        
         # ====================================================
         # PREPROCESSING
         # ====================================================
