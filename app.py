@@ -524,17 +524,6 @@ def summarize_article(
         preprocess_article(text)
     )
 
-    st.write("### DEBUG INPUT")
-    st.write("Jumlah karakter:", len(text))
-    st.write("Jumlah karakter setelah preprocessing:", len(normalized_text))
-    st.write("Jumlah kalimat:", len(sentences))
-
-    st.text_area(
-        "Teks yang benar-benar diproses sistem",
-        value=normalized_text,
-        height=400
-    )
-
     if len(sentences) == 0:
 
         raise ValueError(
