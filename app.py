@@ -2,12 +2,13 @@ import re
 import math
 import difflib
 import time
-
+import requests
 import numpy as np
 import pandas as pd
 import streamlit as st
 import torch
 
+from bs4 import BeautifulSoup
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
@@ -167,6 +168,89 @@ def preprocess_article(text: str) -> tuple[str, list[str]]:
 
     return normalized, sentences
 
+# ============================================================
+# EKSTRAKSI ARTIKEL DARI URL
+# ============================================================
+
+def extract_article_from_url(url: str) -> str:
+    """
+    Mengambil isi artikel dari URL Mongabay.
+    """
+
+    if not isinstance(url, str) or not url.strip():
+        raise ValueError("URL artikel tidak boleh kosong.")
+
+    url = url.strip()
+
+    if not re.match(r"^https?://", url):
+        raise ValueError(
+            "URL harus diawali dengan http:// atau https://"
+        )
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 "
+            "(KHTML, like Gecko) "
+            "Chrome/131.0.0.0 Safari/537.36"
+        )
+    }
+
+    response = requests.get(
+        url,
+        headers=headers,
+        timeout=20
+    )
+
+    response.raise_for_status()
+
+    soup = BeautifulSoup(
+        response.text,
+        "html.parser"
+    )
+
+    # Mencari isi artikel
+    article = soup.find(
+        "div",
+        class_=re.compile(
+            r"(entry-content|post-content|article-content)"
+        )
+    )
+
+    if article is None:
+        article = soup.find("article")
+
+    if article is None:
+        raise ValueError(
+            "Isi artikel tidak ditemukan pada URL tersebut."
+        )
+
+    # Hapus elemen yang tidak diperlukan
+    for element in article.find_all(
+        ["script", "style", "nav", "footer", "aside"]
+    ):
+        element.decompose()
+
+    paragraphs = article.find_all("p")
+
+    article_text = " ".join(
+        p.get_text(" ", strip=True)
+        for p in paragraphs
+        if p.get_text(" ", strip=True)
+    )
+
+    article_text = re.sub(
+        r"\s+",
+        " ",
+        article_text
+    ).strip()
+
+    if not article_text:
+        raise ValueError(
+            "Teks artikel tidak berhasil diambil dari URL."
+        )
+
+    return article_text
 
 # ============================================================
 # SBERT + COSINE SIMILARITY
@@ -614,35 +698,66 @@ st.subheader(
     "Masukkan Artikel"
 )
 
+input_mode = st.radio(
+    "Pilih sumber artikel:",
+    [
+        "URL Artikel",
+        "Masukkan Teks"
+    ],
+    horizontal=True
+)
+
+
 def reset_article():
     st.session_state.article_input = ""
+    st.session_state.article_url = ""
 
-article = st.text_area(
-    "Teks artikel",
-    height=350,
-    placeholder=(
-        "Tempel artikel berita "
-        "yang ingin diringkas di sini..."
-    ),
-    key="article_input",
-)
+
+if input_mode == "URL Artikel":
+
+    article_url = st.text_input(
+        "URL Artikel Mongabay",
+        placeholder=(
+            "https://mongabay.co.id/..."
+        ),
+        key="article_url"
+    )
+
+    article = ""
+
+
+else:
+
+    article = st.text_area(
+        "Teks artikel",
+        height=350,
+        placeholder=(
+            "Tempel artikel berita "
+            "yang ingin diringkas di sini..."
+        ),
+        key="article_input"
+    )
+
+    article_url = ""
 
 
 col1, col2 = st.columns([2, 1])
 
 with col1:
+
     process_button = st.button(
-        "Ringkas",
+        "🔍 Ringkas",
         type="primary",
-        use_container_width=True,
+        use_container_width=True
     )
 
 with col2:
+
     reset_button = st.button(
         "Reset",
         type="primary",
         use_container_width=True,
-        on_click=reset_article,
+        on_click=reset_article
     )
 # ============================================================
 # PROSES
@@ -650,14 +765,66 @@ with col2:
 
 if process_button:
 
-    if not article.strip():
+    # ========================================================
+    # VALIDASI DAN PENGAMBILAN ARTIKEL
+    # ========================================================
 
-        st.warning(
-            "Silakan masukkan teks artikel "
-            "terlebih dahulu."
-        )
+    if input_mode == "URL Artikel":
 
-        st.stop()
+        if not article_url.strip():
+
+            st.warning(
+                "Silakan masukkan URL artikel "
+                "terlebih dahulu."
+            )
+
+            st.stop()
+
+        try:
+
+            with st.spinner(
+                "Mengambil artikel dari URL..."
+            ):
+
+                article = extract_article_from_url(
+                    article_url
+                )
+
+            st.success(
+                "Artikel berhasil diambil dari URL."
+            )
+
+        except requests.exceptions.RequestException as exc:
+
+            st.error(
+                "URL artikel tidak dapat diakses."
+            )
+
+            st.exception(exc)
+
+            st.stop()
+
+        except Exception as exc:
+
+            st.error(
+                "Artikel tidak dapat diambil "
+                "dari URL tersebut."
+            )
+
+            st.exception(exc)
+
+            st.stop()
+
+    else:
+
+        if not article.strip():
+
+            st.warning(
+                "Silakan masukkan teks artikel "
+                "terlebih dahulu."
+            )
+
+            st.stop()
 
     try:
 
