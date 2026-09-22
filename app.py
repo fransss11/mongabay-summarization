@@ -524,6 +524,15 @@ def summarize_article(
         preprocess_article(text)
     )
 
+    st.write("### Debug Input")
+    st.write("Jumlah karakter:", len(text))
+    st.write("Jumlah kalimat:", len(sentences))
+    st.text_area(
+        "Input yang diproses",
+        value=text,
+        height=300
+    )
+
     if len(sentences) == 0:
 
         raise ValueError(
