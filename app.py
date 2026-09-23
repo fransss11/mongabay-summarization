@@ -5,6 +5,7 @@ import time
 import requests
 import numpy as np
 import pandas as pd
+import altair as alt
 import streamlit as st
 import torch
 
@@ -1009,43 +1010,174 @@ if process_button:
         # ====================================================
         # SKOR REPRESENTATIVENESS
         # ====================================================
+        # ============================================================
+        # VISUALISASI COSINE SIMILARITY
+        # ============================================================
 
         with st.expander(
-            "📊 Lihat hubungan cosine similarity antar kalimat"
+            "📊 Lihat visualisasi cosine similarity"
         ):
+
+            # ========================================================
+            # HISTOGRAM SKOR REPRESENTATIVENESS
+            # ========================================================
+
+            st.markdown(
+                "### 📈 Distribusi Skor Representativeness"
+            )
+
+            st.write(
+                "Histogram menunjukkan distribusi nilai "
+                "Average Similarity dari seluruh kalimat "
+                "pada artikel. Nilai yang lebih tinggi "
+                "menunjukkan tingkat representativitas "
+                "yang lebih tinggi terhadap kalimat lainnya."
+            )
+
+            scores = np.asarray(
+                result["avg_scores"],
+                dtype=float
+            )
+
+            score_df = pd.DataFrame({
+                "Average Similarity": scores
+            })
+
+            histogram = (
+                alt.Chart(score_df)
+                .mark_bar()
+                .encode(
+                    x=alt.X(
+                        "Average Similarity:Q",
+                        bin=alt.Bin(maxbins=10),
+                        title="Average Similarity"
+                    ),
+                    y=alt.Y(
+                        "count():Q",
+                        title="Jumlah Kalimat"
+                    ),
+                    tooltip=[
+                        alt.Tooltip(
+                            "count():Q",
+                            title="Jumlah Kalimat"
+                        )
+                    ]
+                )
+                .properties(
+                    height=400
+                )
+            )
+
+            st.altair_chart(
+                histogram,
+                use_container_width=True
+            )
+
+
+            # ========================================================
+            # HEATMAP COSINE SIMILARITY ANTAR KALIMAT
+            # ========================================================
+
+            st.markdown(
+                "### 🔗 Hubungan Cosine Similarity Antar Kalimat"
+            )
+
+            st.write(
+                "Heatmap menunjukkan hubungan tingkat "
+                "kemiripan semantik antar pasangan kalimat "
+                "berdasarkan embedding Sentence-BERT. "
+                "Nilai yang lebih tinggi menunjukkan "
+                "kemiripan semantik yang lebih tinggi."
+            )
 
             similarity_matrix = np.asarray(
                 result["similarity_matrix"],
                 dtype=float
             )
 
+            sentence_count = len(
+                result["sentences"]
+            )
+
             sentence_labels = [
                 f"Kalimat {i}"
                 for i in range(
                     1,
-                    len(result["sentences"]) + 1
+                    sentence_count + 1
                 )
             ]
 
-            similarity_df = pd.DataFrame(
-                similarity_matrix,
-                index=sentence_labels,
-                columns=sentence_labels
+            # Data matriks untuk heatmap
+            heatmap_rows = []
+
+            for i in range(sentence_count):
+
+                for j in range(sentence_count):
+
+                    heatmap_rows.append({
+                        "Kalimat X":
+                            sentence_labels[i],
+
+                        "Kalimat Y":
+                            sentence_labels[j],
+
+                        "Similarity":
+                            float(
+                                similarity_matrix[i, j]
+                            ),
+                    })
+
+            heatmap_df = pd.DataFrame(
+                heatmap_rows
             )
 
-            st.write(
-                "Matriks berikut menunjukkan nilai cosine similarity "
-                "antar kalimat berdasarkan representasi embedding SBERT. "
-                "Nilai yang lebih tinggi menunjukkan kemiripan semantik "
-                "yang lebih tinggi antar kalimat."
+            heatmap = (
+                alt.Chart(heatmap_df)
+                .mark_rect()
+                .encode(
+                    x=alt.X(
+                        "Kalimat X:O",
+                        title="Kalimat"
+                    ),
+                    y=alt.Y(
+                        "Kalimat Y:O",
+                        title="Kalimat"
+                    ),
+                    color=alt.Color(
+                        "Similarity:Q",
+                        scale=alt.Scale(
+                            domain=[0, 1]
+                        ),
+                        legend=alt.Legend(
+                            title="Cosine Similarity"
+                        )
+                    ),
+                    tooltip=[
+                        alt.Tooltip(
+                            "Kalimat X:N",
+                            title="Kalimat"
+                        ),
+                        alt.Tooltip(
+                            "Kalimat Y:N",
+                            title="Kalimat"
+                        ),
+                        alt.Tooltip(
+                            "Similarity:Q",
+                            title="Similarity",
+                            format=".4f"
+                        )
+                    ]
+                )
+                .properties(
+                    height=500
+                )
             )
 
-            st.dataframe(
-                similarity_df,
-                use_container_width=True,
-                height=500
+            st.altair_chart(
+                heatmap,
+                use_container_width=True
             )
-        
+            
         # ====================================================
         # PREPROCESSING
         # ====================================================
