@@ -716,9 +716,9 @@ def reset_article():
 if input_mode == "URL Artikel":
 
     article_url = st.text_input(
-        "URL Artikel Mongabay",
+        "URL Artikel Berita",
         placeholder=(
-            "https://mongabay.co.id/..."
+            "Masukkan URL Artikel Berita"
         ),
         key="article_url"
     )
