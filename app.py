@@ -245,6 +245,13 @@ def extract_article_from_url(url: str) -> str:
         article_text
     ).strip()
 
+    # ============================================================
+    # BATAS PENGAMBILAN ISI ARTIKEL
+    # ============================================================
+    # Jika ditemukan tanda "*****", hanya ambil teks sebelum tanda tersebut.
+    if "*****" in article_text:
+        article_text = article_text.split("*****", 1)[0].strip()
+
     if not article_text:
         raise ValueError(
             "Teks artikel tidak berhasil diambil dari URL."
