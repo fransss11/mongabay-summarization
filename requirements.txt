@@ -2,7 +2,6 @@ streamlit
 torch
 numpy
 pandas
-altair
 requests
 beautifulsoup4
 sentence-transformers
