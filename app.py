@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from urllib.parse import urlparse
 
 
 # ============================================================
@@ -172,78 +173,101 @@ def preprocess_article(text: str) -> tuple[str, list[str]]:
 # EKSTRAKSI ARTIKEL DARI URL
 # ============================================================
 
-def extract_article_from_url(url: str) -> str:
-    """
-    Mengambil isi artikel dari URL Mongabay.
-    """
-
-    if not isinstance(url, str) or not url.strip():
-        raise ValueError("URL artikel tidak boleh kosong.")
-
-    url = url.strip()
-
-    if not re.match(r"^https?://", url):
-        raise ValueError(
-            "URL harus diawali dengan http:// atau https://"
-        )
-
+def extract_article_from_url(article_url):
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 "
-            "(KHTML, like Gecko) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/131.0.0.0 Safari/537.36"
-        )
+        ),
+        "Accept": (
+            "text/html,application/json,"
+            "application/xhtml+xml,*/*"
+        ),
     }
 
-    response = requests.get(
-        url,
-        headers=headers,
-        timeout=20
+    parsed_url = urlparse(article_url)
+
+    if parsed_url.netloc not in {
+        "mongabay.co.id",
+        "www.mongabay.co.id",
+    }:
+        raise ValueError("URL harus berasal dari situs Mongabay.")
+
+    session = requests.Session()
+    session.headers.update(headers)
+
+    # Coba mengambil artikel melalui WordPress REST API.
+    slug = parsed_url.path.strip("/").split("/")[-1]
+    api_url = (
+        "https://mongabay.co.id/wp-json/wp/v2/posts"
     )
 
+    try:
+        response = session.get(
+            api_url,
+            params={
+                "slug": slug,
+                "_fields": "title,content,link",
+            },
+            timeout=20,
+        )
+        response.raise_for_status()
+
+        posts = response.json()
+
+        if posts:
+            content_html = posts[0]["content"]["rendered"]
+            soup = BeautifulSoup(
+                content_html, "html.parser"
+            )
+
+            for tag in soup(
+                ["script", "style", "noscript"]
+            ):
+                tag.decompose()
+
+            article_text = soup.get_text(
+                separator=" ", strip=True
+            )
+
+            if article_text:
+                return article_text
+
+    except requests.RequestException:
+        pass
+
+    # Jika API gagal, coba mengambil halaman artikel.
+    response = session.get(
+        article_url,
+        timeout=20,
+    )
     response.raise_for_status()
 
     soup = BeautifulSoup(
-        response.text,
-        "html.parser"
+        response.text, "html.parser"
     )
 
-    # Mencari isi artikel
-    article = soup.find(
-        "div",
-        class_=re.compile(
-            r"(entry-content|post-content|article-content)"
-        )
-    )
-
-    if article is None:
-        article = soup.find("article")
+    article = soup.find("article")
 
     if article is None:
         raise ValueError(
-            "Isi artikel tidak ditemukan pada URL tersebut."
+            "Isi artikel tidak ditemukan pada halaman."
         )
 
-    # Hapus elemen yang tidak diperlukan
-    for element in article.find_all(
-        ["script", "style", "nav", "footer", "aside"]
+    for tag in article(
+        ["script", "style", "noscript"]
     ):
-        element.decompose()
+        tag.decompose()
 
-    paragraphs = article.find_all("p")
-
-    article_text = " ".join(
-        p.get_text(" ", strip=True)
-        for p in paragraphs
-        if p.get_text(" ", strip=True)
+    article_text = article.get_text(
+        separator=" ", strip=True
     )
 
-    article_text = re.sub(
-        r"\s+",
-        " ",
-        article_text
-    ).strip()
+    if not article_text:
+        raise ValueError("Isi artikel kosong.")
+
+    return article_text
 
     # ============================================================
     # BATAS PENGAMBILAN ISI ARTIKEL
