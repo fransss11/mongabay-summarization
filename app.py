@@ -242,6 +242,12 @@ def extract_article_from_url(article_url):
         article_url,
         timeout=20,
     )
+    print("URL:", response.url)
+    print("STATUS:", response.status_code)
+    print("SERVER:", response.headers.get("server"))
+    print("CONTENT-TYPE:", response.headers.get("content-type"))
+    print("RESPONSE:", response.text[:500])
+
     response.raise_for_status()
 
     soup = BeautifulSoup(
